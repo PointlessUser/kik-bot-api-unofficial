@@ -2,9 +2,12 @@ import logging
 import sys
 
 # turn on logging with basic configuration
-def set_up_basic_logging():
+def set_up_basic_logging(debug=False):
     logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
+    if debug:
+        logger.setLevel(logging.DEBUG)
+    else:
+        logger.setLevel(logging.INFO)
     stream_handler = logging.StreamHandler(sys.stdout)
     stream_handler.setFormatter(logging.Formatter(log_format()))
     logger.addHandler(stream_handler)
