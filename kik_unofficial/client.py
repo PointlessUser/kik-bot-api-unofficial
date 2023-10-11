@@ -32,7 +32,7 @@ class KikClient:
     The main kik class with which you're managing a kik connection and sending commands
     """
     def __init__(self, callback: callbacks.KikClientCallback, kik_username: str, kik_password: str,
-                 kik_node: str = None, device_id: str = None, android_id: str = random_android_id(), logging: bool = False) -> None:
+                 kik_node: str = None, device_id: str = None, android_id: str = random_android_id(), logging: bool = False, debug: bool = False) -> None:
         """
         Initializes a connection to Kik servers.
         If you want to automatically login too, use the username and password parameters.
@@ -47,10 +47,11 @@ class KikClient:
         :param device_id: a unique device ID. If you don't supply one, a random one will be generated. (generated at _on_connection_made)
         :param android_id: a unique android ID. If you don't supply one, a random one will be generated.
         :param logging: If true, turns on logging to stdout (default: False)
+        :param debug: If true, turns on debug logging (default: False)
         """
         # turn on logging with basic configuration
         if logging:
-            set_up_basic_logging()
+            set_up_basic_logging(debug=debug)
         
         self.username = kik_username
         self.password = kik_password
@@ -547,13 +548,15 @@ class KikClient:
         :param data: The data received (bytes)
         """
         if data == b' ':
+            log.debug("[!] Received keep-alive.")
             # Happens every half hour. Disconnect after 10th time. Some kind of keep-alive? Let's send it back.
-            self.loop.call_soon_threadsafe(self.connection.send_raw_data, b' ')
+            self.loop.call_soon_threadsafe(self.connection.send_raw_data, data)
             return
 
+        
         xml_element = BeautifulSoup(data.decode('utf-8'), features='xml')
         xml_element = next(iter(xml_element)) if len(xml_element) > 0 else xml_element
-
+        log.debug(f"[!] Received new data: {xml_element.name}")
         # choose the handler based on the XML tag name
 
         if xml_element.name == "k":
@@ -736,9 +739,9 @@ class KikConnection(Protocol):
     def __init__(self, loop, api: KikClient):
         self.api = api
         self.loop = loop
-        self.partial_data = None  # type: bytes
-        self.partial_data_start_tag = None  # type: str
-        self.transport = None  # type: Transport
+        self.partial_data: bytes = None
+        self.partial_data_start_tag: str = None
+        self.transport: Transport = None
 
     def connection_made(self, transport: Transport):
         self.transport = transport
@@ -748,7 +751,8 @@ class KikConnection(Protocol):
     def data_received(self, data: bytes):
         log.debug("[+] Received raw data: %s", data)
         if self.partial_data is None:
-            if len(data) < 16384:
+            if len(data) < 65535: # 65535 is the max size of a single packet
+                log.debug(f"Single packet data: size={len(data)}")
                 self.loop.call_soon_threadsafe(self.api._on_new_data_received, data)
             else:
                 log.debug("Multi-packet data, waiting for next packet.")
@@ -756,6 +760,7 @@ class KikConnection(Protocol):
                 self.partial_data_start_tag = start_tag
                 self.partial_data = data
         elif self.ends_with_tag(self.partial_data_start_tag, data):
+            log.debug("Last packet received.")
             self.loop.call_soon_threadsafe(self.api._on_new_data_received, self.partial_data + data)
             self.partial_data = None
             self.partial_data_start_tag = None

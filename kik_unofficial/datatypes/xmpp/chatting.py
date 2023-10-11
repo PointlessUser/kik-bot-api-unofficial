@@ -7,6 +7,7 @@ import os
 import requests
 import json
 import base64
+import random
 from io import BytesIO
 from PIL import Image
 from bs4 import BeautifulSoup
@@ -375,13 +376,15 @@ class IncomingGroupSticker(XMPPResponse):
         self.sticker_id = extras_map['sticker_id'] if 'sticker_id' in extras_map else None
         self.sticker_source = extras_map['sticker_source'] if 'sticker_source' in extras_map else None
         self.png_preview = content.images.find('png-preview').text if content.images.find('png-preview') else None
-        self.uris = []
-        if content.uri: self.uris.extend(self.Uri(uri) for uri in content.uri)
+        
+        #self.uris = []
+        #if content.uri: self.uris.extend(self.Uri(uri) for uri in content.uri)
 
-    class Uri:
-        def __init__(self, uri):
-            self.platform = uri['platform']
-            self.url = uri.text
+    # URI only returns https://stickers.kik.com/ which causes an error, so it's commented out for now
+    # class Uri: 
+    #     def __init__(self, uri):
+    #         self.platform = uri['platform']
+    #         self.url = uri.text
 
     @staticmethod
     def parse_extras(extras):
@@ -461,17 +464,19 @@ class OutgoingGIFMessage(XMPPElement):
     def get_gif_data(self, search_term, API_key): 
         if not API_key:
             raise Exception("A tendor.com API key is required to search for GIFs images. please get one and change it")
-
-        r = requests.get(f"https://tenor.googleapis.com/v2/search?q={search_term}&key={API_key}&limit=1")
+        
+        lmt = 8 # number of gifs to return
+        selected_gif = random.randint(0, lmt-1) # select a random gif from the returned gifs
+        r = requests.get(f"https://tenor.googleapis.com/v2/search?q={search_term}&key={API_key}&limit={lmt}")
         if r.status_code == 200:
             gif = json.loads(r.content.decode('ascii'))
-            response = requests.get(gif["results"][0]["media_formats"]["nanogifpreview"]["url"])
+            response = requests.get(gif["results"][selected_gif]["media_formats"]["nanogifpreview"]["url"])
             img = Image.open(BytesIO(response.content))
             buffered = BytesIO()
 
             img.convert("RGB").save(buffered, format="JPEG")
             img_str = base64.b64encode(buffered.getvalue()).decode('ascii')
-            return img_str, gif["results"][0]["media_formats"]
+            return img_str, gif["results"][selected_gif]["media_formats"]
         else:
             return ""
 
