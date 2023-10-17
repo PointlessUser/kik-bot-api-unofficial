@@ -480,7 +480,7 @@ class OutgoingGIFMessage(XMPPElement):
         selected_gif = random.randint(0, lmt-1) # select a random gif from the returned gifs
         r = requests.get(f"https://tenor.googleapis.com/v2/search?q={search_term}&key={API_key}&limit={lmt}")
         if r.status_code == 200:
-            gif = json.loads(r.content.decode('ascii'))
+            gif = json.loads(r.content)
             response = requests.get(gif["results"][selected_gif]["media_formats"]["nanogifpreview"]["url"])
             img = Image.open(BytesIO(response.content))
             buffered = BytesIO()
