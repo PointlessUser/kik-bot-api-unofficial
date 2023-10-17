@@ -20,6 +20,7 @@ class OutgoingChatMessage(XMPPElement):
     """
     Represents an outgoing text chat message to another kik entity (member or group)
     """
+
     def __init__(self, peer_jid, body, is_group=False, bot_mention_jid=None):
         super().__init__()
         self.peer_jid = peer_jid
@@ -50,6 +51,7 @@ class OutgoingGroupChatMessage(OutgoingChatMessage):
     """
     Represents an outgoing text chat message to a group
     """
+
     def __init__(self, group_jid, body, bot_mention_jid):
         super().__init__(group_jid, body, is_group=True, bot_mention_jid=bot_mention_jid)
 
@@ -58,6 +60,7 @@ class OutgoingChatImage(XMPPElement):
     """
    Represents an outgoing image chat message to another kik entity (member or group)
    """
+
     def __init__(self, peer_jid, file_location, is_group=False, forward=True):
         super().__init__()
         self.peer_jid = peer_jid
@@ -97,8 +100,7 @@ class OutgoingChatImage(XMPPElement):
             '</message>'
         )
 
-        
-        packets =  [data[s:s+16384].encode() for s in range(0, len(data), 16384)]
+        packets = [data[s:s + 16384].encode() for s in range(0, len(data), 16384)]
         return list(packets)
 
 
@@ -106,6 +108,7 @@ class OutgoingGroupChatImage(OutgoingChatImage):
     """
     Represents an outgoing image chat message to a group
     """
+
     def __init__(self, group_jid, file_location, forward):
         super().__init__(group_jid, file_location, is_group=True, forward=forward)
 
@@ -114,6 +117,7 @@ class IncomingChatMessage(XMPPResponse):
     """
     Represents an incoming text chat message from another user
     """
+
     def __init__(self, data: BeautifulSoup):
         super().__init__(data)
         self.request_delivered_receipt = data.request['d'] == 'true' if 'd' in data.request.attrs else False
@@ -132,6 +136,7 @@ class IncomingGroupChatMessage(IncomingChatMessage):
     """
     Represents an incoming text chat message from a group
     """
+
     def __init__(self, data: BeautifulSoup):
         super().__init__(data)
         self.group_jid = data.g['jid']
@@ -143,6 +148,7 @@ class OutgoingReadReceipt(XMPPElement):
     """
     Represents an outgoing read receipt to a specific user, for one or more messages
     """
+
     def __init__(self, peer_jid, receipt_message_id, group_jid=None):
         super().__init__()
         self.peer_jid = peer_jid
@@ -235,7 +241,7 @@ class OutgoingLinkShareEvent(XMPPElement):
     def serialize(self):
         message_type = 'type="groupchat" xmlns="kik:groups"' if 'group' in self.peer_jid else 'type="chat"'
         timestamp = str(int(round(time.time() * 1000)))
-        
+
         data = (f'<message {message_type} to="{self.peer_jid}" id="{self.message_id}" cts="{timestamp}">'
                 '<pb></pb>'
                 f'<kik push="true" qos="true" timestamp="{timestamp}" />'
@@ -259,7 +265,7 @@ class OutgoingLinkShareEvent(XMPPElement):
                 '</uris>'
                 '</content>'
                 '</message>')
-        
+
         return data.encode()
 
 
@@ -299,7 +305,8 @@ class IncomingGroupStatus(XMPPResponse):
 
     def __init__(self, data: BeautifulSoup):
         super().__init__(data)
-        self.request_delivered_receipt = data.request['d'] == 'true' if data.request and 'd' in data.request.attrs else False
+        self.request_delivered_receipt = data.request[
+                                             'd'] == 'true' if data.request and 'd' in data.request.attrs else False
         self.requets_read_receipt = data.request['r'] == 'true' if data.request and 'r' in data.request.attrs else False
         self.group_jid = data['from']
         self.to_jid = data['to']
@@ -313,7 +320,8 @@ class IncomingGroupSysmsg(XMPPResponse):
 
     def __init__(self, data: BeautifulSoup):
         super().__init__(data)
-        self.request_delivered_receipt = data.request['d'] == 'true' if data.request and 'd' in data.request.attrs else False
+        self.request_delivered_receipt = data.request[
+                                             'd'] == 'true' if data.request and 'd' in data.request.attrs else False
         self.requets_read_receipt = data.request['r'] == 'true' if data.request and 'r' in data.request.attrs else False
         self.group_jid = data['from']
         self.to_jid = data['to']
@@ -355,7 +363,8 @@ class IncomingStatusResponse(XMPPResponse):
 class IncomingImageMessage(XMPPResponse):
     def __init__(self, data: BeautifulSoup):
         super().__init__(data)
-        self.request_delivered_receipt = data.request['d'] == 'true' if data.request and 'd' in data.request.attrs else False
+        self.request_delivered_receipt = data.request[
+                                             'd'] == 'true' if data.request and 'd' in data.request.attrs else False
         self.requets_read_receipt = data.request['r'] == 'true' if data.request and 'r' in data.request.attrs else False
         self.image_url = data.find('file-url').get_text() if data.find('file-url') else None
         self.status = data.status.text if data.status else None
@@ -395,9 +404,11 @@ class IncomingGifMessage(XMPPResponse):
     """
     Represents an incoming GIF message from another kik entity, sent as a URL
     """
+
     def __init__(self, data: BeautifulSoup):
         super().__init__(data)
-        self.request_delivered_receipt = data.request['d'] == 'true' if data.request and 'd' in data.request.attrs else False
+        self.request_delivered_receipt = data.request[
+                                             'd'] == 'true' if data.request and 'd' in data.request.attrs else False
         self.requets_read_receipt = data.request['r'] == 'true' if data.request and 'r' in data.request.attrs else False
         self.status = data.status.text if data.status else None
         self.from_jid = data['from'] if data else None
@@ -416,6 +427,7 @@ class OutgoingGIFMessage(XMPPElement):
     """
 	Represents an outgoing GIF message to another kik entity (member or group)
 	"""
+
     def __init__(self, peer_jid, search_term, API_key, is_group=True):
         super().__init__()
         self.peer_jid = peer_jid
@@ -457,11 +469,10 @@ class OutgoingGIFMessage(XMPPElement):
             '</message>'
         )
 
-
         packets = [data[s:s + 16384].encode() for s in range(0, len(data), 16384)]
         return list(packets)
 
-    def get_gif_data(self, search_term, API_key): 
+    def get_gif_data(self, search_term, API_key):
         if not API_key:
             raise Exception("A tendor.com API key is required to search for GIFs images. please get one and change it")
         
@@ -484,7 +495,8 @@ class OutgoingGIFMessage(XMPPElement):
 class IncomingVideoMessage(XMPPResponse):
     def __init__(self, data: BeautifulSoup):
         super().__init__(data)
-        self.request_delivered_receipt = data.request['d'] == 'true' if data.request and 'd' in data.request.attrs else False
+        self.request_delivered_receipt = data.request[
+                                             'd'] == 'true' if data.request and 'd' in data.request.attrs else False
         self.requets_read_receipt = data.request['r'] == 'true' if data.request and 'r' in data.request.attrs else False
         self.video_url = data.find('file-url').text
         self.file_content_type = data.find('file-content-type').text if data.find('file-content-type') else None
@@ -498,7 +510,8 @@ class IncomingVideoMessage(XMPPResponse):
 class IncomingCardMessage(XMPPResponse):
     def __init__(self, data: BeautifulSoup):
         super().__init__(data)
-        self.request_delivered_receipt = data.request['d'] == 'true' if data.request and 'd' in data.request.attrs else False
+        self.request_delivered_receipt = data.request[
+                                             'd'] == 'true' if data.request and 'd' in data.request.attrs else False
         self.request_read_receipt = data.request['r'] == 'true' if data.request and 'r' in data.request.attrs else False
         self.from_jid = data['from']
         self.to_jid = data['to']
@@ -513,3 +526,20 @@ class IncomingCardMessage(XMPPResponse):
         self.uri = data.find('uri').text if data.find('uri') else None
 
 
+class KikPingRequest(XMPPElement):
+    def __init__(self):
+        super().__init__()
+
+    def serialize(self) -> bytes:
+        data = ('<ping/>')
+
+        return data.encode()
+
+
+class KikPongResponse:
+    """
+    Response to a <ping/> request to kik servers
+    """
+
+    def __init__(self, data: BeautifulSoup):
+        self.recieved_time = time.time()
