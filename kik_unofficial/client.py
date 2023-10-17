@@ -20,7 +20,7 @@ from kik_unofficial.utilities.threading_utils import run_in_new_thread
 from kik_unofficial.datatypes.xmpp.base_elements import XMPPElement
 from kik_unofficial.http import profile_pictures, content
 from kik_unofficial.utilities.credential_utilities import random_device_id, random_android_id
-from kik_unofficial.utilities.logging_utils import set_up_basic_logging
+from kik_unofficial.utilities.logging_utils import setup_basic_logging
 
 HOST, PORT = "talk1110an.kik.com", 5223
 
@@ -31,8 +31,8 @@ class KikClient:
     """
 
     def __init__(self, callback: callbacks.KikClientCallback, kik_username: str, kik_password: str,
-                 kik_node: str = None, device_id: str = None, android_id: str = random_android_id(), log_level: int = 1,
-                 enable_logging: bool = False, log_file_path: str = None) -> None:
+                 kik_node: str = None, device_id: str = None, android_id: str = random_android_id(), 
+                 enable_logging: bool = False, log_level: int = 2, log_file_path: str = None) -> None:
         """
         Initializes a connection to Kik servers.
         If you want to automatically login too, use the username and password parameters.
@@ -47,11 +47,12 @@ class KikClient:
         :param device_id: a unique device ID. If you don't supply one, a random one will be generated. (generated at _on_connection_made)
         :param android_id: a unique android ID. If you don't supply one, a random one will be generated.
         :param enable_logging: If true, turns on logging to stdout (default: False)
-        ;param log_file_path: If set will create a daily rotated log file and archive for 7 days.
+        :param log_level: The log level to use for logging (default: 2)
+        :param log_file_path: If set will create a daily rotated log file and archive for 7 days.
         """
         # turn on logging with basic configuration
         if enable_logging:
-            self.log = set_up_basic_logging(log_level=log_level, logger_name="kik_unofficial", log_file_path=log_file_path)
+            self.log = setup_basic_logging(log_level=log_level, logger_name="kik_unofficial", log_file_path=log_file_path)
 
         self.username = kik_username
         self.password = kik_password
@@ -560,33 +561,44 @@ class KikClient:
         :param data: The data received (bytes)
         """
         if data == b' ':
-            log.debug("[!] Received keep-alive.")
             # Happens every half hour. Disconnect after 10th time. Some kind of keep-alive? Let's send it back.
+            self.log.debug("[!] Received keep-alive.")
             self.loop.call_soon_threadsafe(self.connection.send_raw_data, data)
             return
 
         
         xml_element = BeautifulSoup(data.decode('utf-8'), features='xml')
         xml_element = next(iter(xml_element)) if len(xml_element) > 0 else xml_element
-        log.debug(f"[!] Received new data: {xml_element.name}")
+        
+        # describe the meaning of each XML tag (for logging purposes)
+        xml_tag_meaning = {
+            'k': 'kik connection',
+            'iq': 'info/query',
+            'message': 'message',
+            'stc': 'captcha/ban',
+            'ack': 'acknowledgement',
+            'pong': 'pong'
+        }
+        
+        self.log.debug(f"Received xml type: {xml_tag_meaning.get(xml_element.name, xml_element.name)}")
+        
         # choose the handler based on the XML tag name
-
-        if xml_element.name == "k":
+        if xml_element.name == "k": # kik connection
             self._handle_received_k_element(xml_element)
-        elif xml_element.name == "iq":
+        elif xml_element.name == "iq": # info/query
             self._handle_received_iq_element(xml_element)
-        elif xml_element.name == "message":
+        elif xml_element.name == "message": # message
             self._handle_xmpp_message(xml_element)
-        elif xml_element.name == 'stc':
-            if xml_element.stp['type'] == 'ca':
+        elif xml_element.name == 'stc': 
+            if xml_element.stp['type'] == 'ca': # captcha
                 self.callback.on_captcha_received(login.CaptchaElement(xml_element))
-            elif xml_element.stp['type'] == 'bn':
+            elif xml_element.stp['type'] == 'bn': # ban
                 self.callback.on_temp_ban_received(login.TempBanElement(xml_element))
             else:
                 self.log.warning(f'Unknown stc element type: {xml_element["type"]}')
-        elif xml_element.name == 'ack':
+        elif xml_element.name == 'ack': # acknowledgement
             pass
-        elif xml_element.name == 'pong':
+        elif xml_element.name == 'pong': # pong
             self.callback.on_pong(chatting.KikPongResponse(xml_element))
         else:
             self.log.warning(f'Unknown element type: {xml_element.name}')
@@ -620,13 +632,14 @@ class KikClient:
         with the same ID attached to it.
         For a great explanation of this stanza: http://slixmpp.readthedocs.io/api/stanza/iq.html
 
-        :param iq_element: The iq XML element we just received from kik.
+        :param iq_element: The iq XML element we just received from kik.n
         """
-        if iq_element.error and "bad-request" in dir(iq_element.error):
-            if "bad-request" in dir(iq_element.error):
-                raise Exception(f'Received a Bad Request error for stanza with ID {iq_element.attrs["id"]}')
-            if iq_element.error.find("service-unavailable"):
-                raise Exception(f'Received a service Unavailable error for stanza with ID {iq_element.attrs["id"]}')
+        if hasattr(iq_element, 'error') and iq_element.error is not None:
+            if hasattr(iq_element.error, 'bad-request'):
+                raise Exception(f'Received a Bad Request error for stanza with ID {iq_element.get("id")}')
+            elif iq_element.error.find("service-unavailable"):
+                raise Exception(f'Received a Service Unavailable error for stanza with ID {iq_element.get("id")}')
+
 
         query = iq_element.query
         xml_namespace = query['xmlns'] if 'xmlns' in query.attrs else query['xmlns:']
@@ -689,7 +702,7 @@ class KikClient:
                 xmlns_handlers.XMPPMessageHandler(self.callback, self).handle(xmpp_element)
             elif xmpp_element['type'] == "error":
                 # error type happens on KIK jail (Restricted Group Access)
-                pass
+                self.log.debug(f'Restricted Group Access: {xmpp_element}')
             else:
                 self.log.warning(f'Received unknown XMPP element type: {xmpp_element}')
         else:
@@ -782,10 +795,9 @@ class KikConnection(Protocol):
         self.api._on_connection_made()
 
     def data_received(self, data: bytes):
-        self.log.debug("Received raw data: %s", data)
+        self.log.debug("Received raw data: %s size = %d bytes", data, len(data))
         if self.partial_data is None:
             if len(data) < 65535: # 65535 is the max size of a single packet
-                self.log.debug(f"Single packet data: size={len(data)}")
                 self.loop.call_soon_threadsafe(self.api._on_new_data_received, data)
             else:
                 self.log.debug("Multi-packet data, waiting for next packet.")

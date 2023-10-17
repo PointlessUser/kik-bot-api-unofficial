@@ -1,21 +1,19 @@
 import logging
 import os.path
-import sys
 from logging.handlers import TimedRotatingFileHandler
-
 from colorama import Fore, Style
 import datetime
 
 
 # turn on logging with basic configuration
-def set_up_basic_logging(log_level=2, logger_name="kik_logger", log_file_path=''):
+def setup_basic_logging(log_level: int = 2, logger_name: str = "kik_logger", log_file_path: str = ''):
     """
     Set up basic logging using CustomLogger.
 
     Args:
-        log_level (int): The logging level (1=DEBUG, 2=INFO, 3=WARNING, 4=ERROR, 5=CRITICAL).
-        logger_name (str): The name of the logger.
-        log_file_path (str): If a path is given a TimeRotated log file will be created.
+        log_level (int): The logging level (1=DEBUG, 2=INFO, 3=WARNING, 4=ERROR, 5=CRITICAL). Defaults to 2.
+        logger_name (str): The name of the logger. Defaults to "kik_logger".
+        log_file_path (str): If a path is given a TimeRotated log file will be created. Defaults to ''.
     """
     # Initialize your custom logger
     return CustomLogger(log_level, logger_name, log_file_path)
